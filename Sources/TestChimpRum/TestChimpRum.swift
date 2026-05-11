@@ -212,7 +212,9 @@ private final class RumRuntime {
         storedSessionId = pair.id
 
         if pair.isNew, captureEnabled {
-            sendSessionStart()
+            queue.sync {
+                sendSessionStart()
+            }
         }
 
         let t = DispatchSource.makeTimerSource(queue: queue)
@@ -236,11 +238,23 @@ private final class RumRuntime {
     }
 
     func handleAutomationURL(_ url: URL) -> Bool {
-        AutomationURL.handle(url, context: automation)
+        if isTrueCoverageClearURL(url) {
+            queue.sync {
+                flushLocked()
+                automation.clear()
+            }
+            return true
+        }
+        return queue.sync {
+            AutomationURL.handle(url, context: automation)
+        }
     }
 
     func clearAutomationContext() {
-        automation.clear()
+        queue.sync {
+            flushLocked()
+            automation.clear()
+        }
     }
 
     func emit(_ input: TestChimpEmitInput) {
@@ -251,10 +265,9 @@ private final class RumRuntime {
             #endif
             return
         }
-        let snap = automation.snapshotForEmit()
-
         queue.async { [weak self] in
             guard let self else { return }
+            let snap = self.automation.snapshotForEmit()
             self.sessionStore.touchActivity()
 
             let title = input.title
@@ -330,30 +343,47 @@ private final class RumRuntime {
     }
 
     private func postEvents(_ events: [BufferedEvent]) {
-        let arr: [[String: Any]] = events.map { e in
-            [
-                "title": e.title,
-                "event_index": e.eventIndex,
-                "timestamp_millis": e.timestampMillis,
-                "metadata": e.metadata ?? [:],
+        for partition in partitionByCiSnapshot(events) {
+            let arr: [[String: Any]] = partition.map { e in
+                [
+                    "title": e.title,
+                    "event_index": e.eventIndex,
+                    "timestamp_millis": e.timestampMillis,
+                    "metadata": e.metadata ?? [:],
+                ]
+            }
+            let body: [String: Any] = [
+                "session_id": storedSessionId,
+                "events": arr,
             ]
+            let ciHeader = partition.first?.ciTestInfoSnapshot
+            post(path: "/rum/events", body: body, ciTestInfo: ciHeader)
         }
-        let body: [String: Any] = [
-            "session_id": storedSessionId,
-            "events": arr,
-        ]
-        let ciHeader = batchCiTestInfoHeader(events)
-        post(path: "/rum/events", body: body, ciTestInfo: ciHeader)
     }
 
-    /// One `ci-test-info` header per request; use first snapshot if all match, else first non-nil (ordered).
-    private func batchCiTestInfoHeader(_ events: [BufferedEvent]) -> String? {
-        let snaps = events.map(\.ciTestInfoSnapshot).compactMap { $0 }
-        guard let first = snaps.first else { return nil }
-        if snaps.allSatisfy({ $0 == first }) {
-            return first
+    private func partitionByCiSnapshot(_ events: [BufferedEvent]) -> [[BufferedEvent]] {
+        guard let first = events.first else { return [] }
+        var out: [[BufferedEvent]] = []
+        var current: [BufferedEvent] = [first]
+        var currentCi = first.ciTestInfoSnapshot
+
+        for event in events.dropFirst() {
+            if event.ciTestInfoSnapshot == currentCi {
+                current.append(event)
+            } else {
+                out.append(current)
+                current = [event]
+                currentCi = event.ciTestInfoSnapshot
+            }
         }
-        return snaps.first
+        out.append(current)
+        return out
+    }
+
+    private func isTrueCoverageClearURL(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "testchimp-rum" else { return false }
+        guard url.host?.lowercased() == "truecoverage" else { return false }
+        return url.path.lowercased() == "/v1/clear"
     }
 
     private func post(path: String, body: [String: Any], ciTestInfo: String?) {
