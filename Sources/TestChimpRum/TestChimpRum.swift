@@ -115,11 +115,14 @@ public enum TestChimpRum {
         r.emit(input)
     }
 
+    /// Drains the in-memory event buffer onto the network queue (synchronous with respect to the RUM serial queue).
+    /// Prefer calling this from `scenePhase == .background` / `UIApplication.willResignActiveNotification` so
+    /// short Mobilewright runs and app relaunches do not drop buffered events before the process suspends.
     public static func flush() {
         lock.lock()
         let r = runtime
         lock.unlock()
-        r?.flush(wait: false)
+        r?.flush(wait: true)
     }
 
     public static func getSessionId() -> String {
