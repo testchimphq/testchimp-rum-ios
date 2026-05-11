@@ -235,18 +235,6 @@ private final class RumRuntime {
         }
     }
 
-    private func defaultMetadataForStart() -> [String: Any] {
-        var m: [String: Any] = [
-            "_os": "ios",
-            "_device_type": "mobile",
-            "_platform": "native",
-        ]
-        #if os(iOS)
-        m["_device_model"] = UIDevice.current.model
-        #endif
-        return m
-    }
-
     func handleAutomationURL(_ url: URL) -> Bool {
         AutomationURL.handle(url, context: automation)
     }
@@ -322,7 +310,7 @@ private final class RumRuntime {
     private func sendSessionStart() {
         var meta: [String: Any] = [:]
         if inner?.enableDefaultSessionMetadata ?? true {
-            meta.merge(defaultMetadataForStart()) { _, new in new }
+            meta.merge(DefaultSessionMetadata.dictionaryForSessionStart()) { _, new in new }
         }
         if let stored = sessionStore.sessionMetadata() {
             meta.merge(stored) { _, new in new }

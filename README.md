@@ -12,7 +12,7 @@ Same HTTP paths, headers (`Project-Id`, `TestChimp-Api-Key`, optional `ci-test-i
 ## Requirements
 
 - **iOS 13+** (Swift 5.9+)
-- **macOS 11+** target is included for SPM resolution; UI/session metadata uses UIKit on iOS.
+- **macOS 11+** target is included for SPM resolution; session defaults use UIKit on iOS (idiom) and `ProcessInfo` on macOS.
 
 ## Add to your Xcode project
 
@@ -66,7 +66,9 @@ TestChimpRum.initialize(TestChimpRumConfig(
 TestChimpRum.emit(TestChimpEmitInput(title: "button_tap", metadata: ["screen": "Home"]))
 ```
 
-Use `config: TestChimpRumConfig.Inner(...)` for advanced options (mirrors JS `config`: `captureEnabled`, `maxEventsPerSession`, `eventSendIntervalMillis`, `testchimpEndpoint`, `automationContextTtlSeconds`, etc.).
+Use `config: TestChimpRumConfig.Inner(...)` for advanced options (mirrors JS `config`: `captureEnabled`, `enableDefaultSessionMetadata`, `maxEventsPerSession`, `eventSendIntervalMillis`, `testchimpEndpoint`, `automationContextTtlSeconds`, etc.).
+
+**Default session metadata** (`enableDefaultSessionMetadata` default `true`): session start includes `_platform` (`ios` or `macos`), `_os`, `_device_type` (`mobile` / `tablet` / `desktop` / `tv` on iOS), `_language`, `_timezone`, `_os_version`, `_device_model` (hardware id when available), `_manufacturer` (`Apple`). This aligns with [@testchimp/rum-js](https://www.npmjs.com/package/@testchimp/rum-js) (`_platform: web`). Older SDKs used `_platform: native`; filter on `ios` / `macos` / `web` / `android` as needed.
 
 ### TrueCoverage (Mobilewright)
 
