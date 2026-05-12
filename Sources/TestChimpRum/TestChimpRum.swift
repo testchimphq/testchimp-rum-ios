@@ -248,6 +248,12 @@ private final class RumRuntime {
             }
             return true
         }
+        if isTrueCoverageFlushURL(url) {
+            queue.sync {
+                flushLocked()
+            }
+            return true
+        }
         return queue.sync {
             AutomationURL.handle(url, context: automation)
         }
@@ -260,6 +266,7 @@ private final class RumRuntime {
         }
     }
 
+    /// Caller-thread CI snapshot (Playwright / TrueCoverage parity with rum-js), then async buffer + flush.
     func emit(_ input: TestChimpEmitInput) {
         guard captureEnabled else { return }
         guard RumValidation.buildEmitPayload(title: input.title, metadata: input.metadata) != nil else {
@@ -268,41 +275,45 @@ private final class RumRuntime {
             #endif
             return
         }
+        let ciSnap = automation.snapshotForEmit()
         queue.async { [weak self] in
             guard let self else { return }
-            let snap = self.automation.snapshotForEmit()
-            self.sessionStore.touchActivity()
+            self.emitOnQueue(input: input, ciSnapshot: ciSnap)
+        }
+    }
 
-            let title = input.title
-            if self.sessionStore.eventCount() >= self.maxEventsPerSession {
-                return
-            }
-            var counts = self.sessionStore.eventTypeCounts()
-            if (counts[title] ?? 0) >= self.maxRepeatsPerEvent {
-                return
-            }
+    private func emitOnQueue(input: TestChimpEmitInput, ciSnapshot: String?) {
+        sessionStore.touchActivity()
 
-            let ts = Int64(Date().timeIntervalSince1970 * 1000)
-            let meta = RumValidation.normalizeMetadata(input.metadata)
+        let title = input.title
+        if sessionStore.eventCount() >= maxEventsPerSession {
+            return
+        }
+        var counts = sessionStore.eventTypeCounts()
+        if (counts[title] ?? 0) >= maxRepeatsPerEvent {
+            return
+        }
 
-            let next = self.sessionStore.eventCount() + 1
-            self.sessionStore.setEventCount(next)
-            counts[title] = (counts[title] ?? 0) + 1
-            self.sessionStore.setEventTypeCounts(counts)
+        let ts = Int64(Date().timeIntervalSince1970 * 1000)
+        let meta = RumValidation.normalizeMetadata(input.metadata)
 
-            self.buffer.append(
-                BufferedEvent(
-                    title: title,
-                    timestampMillis: ts,
-                    metadata: meta,
-                    eventIndex: next,
-                    ciTestInfoSnapshot: snap
-                )
+        let next = sessionStore.eventCount() + 1
+        sessionStore.setEventCount(next)
+        counts[title] = (counts[title] ?? 0) + 1
+        sessionStore.setEventTypeCounts(counts)
+
+        buffer.append(
+            BufferedEvent(
+                title: title,
+                timestampMillis: ts,
+                metadata: meta,
+                eventIndex: next,
+                ciTestInfoSnapshot: ciSnapshot
             )
+        )
 
-            if self.buffer.count >= self.maxBufferSize {
-                self.flushLocked()
-            }
+        if buffer.count >= maxBufferSize {
+            flushLocked()
         }
     }
 
@@ -387,6 +398,12 @@ private final class RumRuntime {
         guard url.scheme?.lowercased() == "testchimp-rum" else { return false }
         guard url.host?.lowercased() == "truecoverage" else { return false }
         return url.path.lowercased() == "/v1/clear"
+    }
+
+    private func isTrueCoverageFlushURL(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "testchimp-rum" else { return false }
+        guard url.host?.lowercased() == "truecoverage" else { return false }
+        return url.path.lowercased() == "/v1/flush"
     }
 
     private func post(path: String, body: [String: Any], ciTestInfo: String?) {

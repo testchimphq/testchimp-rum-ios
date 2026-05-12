@@ -1,7 +1,7 @@
 import Foundation
 
 enum AutomationURL {
-    /// `testchimp-rum://truecoverage/v1/set?p=<base64url>` and `.../v1/clear`
+/// `testchimp-rum://truecoverage/v1/set?p=<base64url>`, `.../v1/clear`; `.../v1/flush` is handled in the runtime (not in `AutomationURL.handle`).
     static func handle(_ url: URL, context: AutomationContext) -> Bool {
         guard url.scheme?.lowercased() == "testchimp-rum" else { return false }
         guard url.host?.lowercased() == "truecoverage" else { return false }

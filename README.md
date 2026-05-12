@@ -102,10 +102,11 @@ struct MyApp: App {
 }
 ```
 
-**Default URLs** (overridable via `TESTCHIMP_RUM_AUTOMATION_SET_PREFIX` / `TESTCHIMP_RUM_AUTOMATION_CLEAR_URL` on the runner):
+**Default URLs** (overridable via `TESTCHIMP_RUM_AUTOMATION_SET_PREFIX` / `TESTCHIMP_RUM_AUTOMATION_CLEAR_URL` / `TESTCHIMP_RUM_AUTOMATION_FLUSH_URL` on the runner):
 
 - Set: `testchimp-rum://truecoverage/v1/set?p=<base64url(JSON)>`
 - Clear: `testchimp-rum://truecoverage/v1/clear`
+- Flush: `testchimp-rum://truecoverage/v1/flush` (drains buffered RUM events; used by `@testchimp/playwright` mobile `afterEach`)
 
 ## Building / sanity check (CLI)
 
