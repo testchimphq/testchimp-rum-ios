@@ -84,6 +84,11 @@ public struct TestChimpEmitInput {
 // MARK: - SDK
 
 public enum TestChimpRum {
+    /// HTTP header for {@link com.aware.protos.common.ExecutionPlatform} ordinal (WEB=1, IOS=2, ANDROID=3).
+    public static let rumPlatformHeaderName = "testchimp-rum-platform"
+    /// IOS (includes macOS targets).
+    public static let iosPlatformOrdinal = 2
+
     private static let lock = NSLock()
     private static var runtime: RumRuntime?
 
@@ -417,6 +422,7 @@ private final class RumRuntime {
         if let ci = ciTestInfo, !ci.isEmpty {
             req.setValue(ci, forHTTPHeaderField: "ci-test-info")
         }
+        req.setValue(String(TestChimpRum.iosPlatformOrdinal), forHTTPHeaderField: TestChimpRum.rumPlatformHeaderName)
         req.httpBody = data
         URLSession.shared.dataTask(with: req).resume()
     }

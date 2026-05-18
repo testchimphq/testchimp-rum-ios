@@ -54,7 +54,7 @@ enum DefaultSessionMetadata {
             m["_device_model"] = truncate(UIDevice.current.model)
         }
         #elseif os(macOS)
-        m["_platform"] = "macos"
+        m["_platform"] = "ios"
         m["_os"] = "mac"
         m["_device_type"] = "desktop"
         let v = ProcessInfo.processInfo.operatingSystemVersion
