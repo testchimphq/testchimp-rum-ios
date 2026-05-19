@@ -160,6 +160,14 @@ public enum TestChimpRum {
         lock.unlock()
         r?.clearAutomationContext()
     }
+
+    /// Whether automation CI is active (TTL-aware). Useful for host debug logging.
+    public static func hasCiTestInfo() -> Bool {
+        lock.lock()
+        let r = runtime
+        lock.unlock()
+        return r?.hasCiTestInfo() ?? false
+    }
 }
 
 // MARK: - Runtime
@@ -260,8 +268,15 @@ private final class RumRuntime {
             return true
         }
         return queue.sync {
-            AutomationURL.handle(url, context: automation)
+            if isTrueCoverageSetURL(url) {
+                beginNewSessionBeforeAutomationSetIfNeeded()
+            }
+            return AutomationURL.handle(url, context: automation)
         }
+    }
+
+    func hasCiTestInfo() -> Bool {
+        automation.hasActiveCiTestInfo()
     }
 
     func clearAutomationContext() {
@@ -397,6 +412,24 @@ private final class RumRuntime {
         }
         out.append(current)
         return out
+    }
+
+    /// First automation `set` in a process (no active CI) starts a fresh RUM session for SmartTests.
+    private func beginNewSessionBeforeAutomationSetIfNeeded() {
+        guard !automation.hasActiveCiTestInfo() else { return }
+        flushLocked()
+        sessionStore.clearAll()
+        let normalizedMeta = RumValidation.normalizeMetadata(config.sessionMetadata)
+        storedSessionId = sessionStore.assignNewSession(metadata: normalizedMeta)
+        if captureEnabled {
+            sendSessionStart()
+        }
+    }
+
+    private func isTrueCoverageSetURL(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "testchimp-rum" else { return false }
+        guard url.host?.lowercased() == "truecoverage" else { return false }
+        return url.path.lowercased() == "/v1/set"
     }
 
     private func isTrueCoverageClearURL(_ url: URL) -> Bool {

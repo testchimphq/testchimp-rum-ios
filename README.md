@@ -108,6 +108,8 @@ struct MyApp: App {
 - Clear: `testchimp-rum://truecoverage/v1/clear`
 - Flush: `testchimp-rum://truecoverage/v1/flush` (drains buffered RUM events; used by `@testchimp/playwright` mobile `afterEach`)
 
+**Per-test RUM session (0.1.5+):** When `/v1/set` runs and no automation CI is active yet in this process, the SDK flushes, clears persisted session state, assigns a new session id, and sends `/rum/session/start` (with `environment` / `release`) before applying CI. Playwright already sends `set` at device fixture start (after `launchApp`); a second `set` in the same process (e.g. `afterEach` resync) only updates CI. Production apps that never receive automation URLs are unchanged.
+
 ## Building / sanity check (CLI)
 
 ```bash

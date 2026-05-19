@@ -78,6 +78,13 @@ final class SessionStore {
         defaults.removeObject(forKey: sessionMetadataKey)
     }
 
+    /// Replaces any persisted session with a new id and zeroed counters (automation per-test boundary).
+    func assignNewSession(metadata: [String: Any]?) -> String {
+        let id = SessionStore.newSessionId()
+        persistSession(id: id, metadata: metadata)
+        return id
+    }
+
     private func persistSession(id: String, metadata: [String: Any]?) {
         let now = Double(Int64(Date().timeIntervalSince1970 * 1000))
         defaults.set(id, forKey: sessionIdKey)
